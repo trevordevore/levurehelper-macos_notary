@@ -232,6 +232,15 @@ private command _monitorAnalysisForCompletion pRequestUUID, pEnvA
           exit repeat
           break
       end switch
+    else if tReturnVal is not empty \
+          and tResult contains "Could not find the RequestUUID" \
+          and tCounter <= 3 then
+      # Apple has reported the following on the first attempt:
+      # Error: Apple Services operation failed. Could not find the RequestUUID.
+      # Theory is that this can happen if you check too soon after creating the request
+      # and it hasn't propagated to all of the servers yet. Try at least three times.
+      _log "mac-notary --notarize-info trying again since Apple couldn't find RequestUUID."
+      wait 10 seconds with messages
     else
       _log "macOS Notary reported an error in" && param(0) && "[" & tResult & "]"
       answer error "macOS Notary reported an error in" && param(0) && "[" & tResult & "]"
