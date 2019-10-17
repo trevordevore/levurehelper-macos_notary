@@ -253,7 +253,7 @@ private command _stapleDMG pFilename
   local tCmd, tResult, tReturnVal
 
   put format("xcrun stapler staple -v \"%s\"", pFilename) into tCmd
-  _log "macos-notary --notarize-info command:" && tCmd
+  _log "macos-notary stapler command:" && tCmd
   put shell(tCmd) into tResult
   put the result into tReturnVal
 
