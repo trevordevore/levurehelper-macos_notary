@@ -234,7 +234,7 @@ private command _monitorAnalysisForCompletion pRequestUUID, pEnvA
       end switch
     else if tReturnVal is not empty \
           and tResult contains "Could not find the RequestUUID" \
-          and tCounter <= 3 then
+          and tCounter <= 5 then
       # Apple has reported the following on the first attempt:
       # Error: Apple Services operation failed. Could not find the RequestUUID.
       # Theory is that this can happen if you check too soon after creating the request
