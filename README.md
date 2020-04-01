@@ -37,9 +37,17 @@ The `.env` file should contain the following lines although `macos_notary_ascpro
 
 ```
 macos_notary_username=YOUR_APPLE_ID
-macos_notary_password=YOUR_APP_PASSWORD
+macos_notary_password=YOUR_APP_PASSWORD_OR_KEYCHAIN_ITEM
 macos_notary_ascprovider=YOUR_TEAMID
 ```
+
+For the `macos_notary_password` you can pass a reference to the password stored in the system keychain. Use the following format:
+
+```
+macos_notary_password=@keychain:KEYCHAIN_ITEM_NAME
+```
+
+To set up a keychain item on your system you can use `xcrun altool --store-password-in-keychain-item` as described in the Apple [documentation](https://developer.apple.com/documentation/xcode/notarizing_macos_software_before_distribution/customizing_the_notarization_workflow?language=objc).
 
 ## Monitoring progress during notarization
 
