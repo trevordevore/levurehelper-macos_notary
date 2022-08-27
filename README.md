@@ -41,6 +41,9 @@ macos_notary_password=YOUR_APP_PASSWORD_OR_KEYCHAIN_ITEM
 macos_notary_ascprovider=YOUR_TEAMID
 ```
 
+The macos_notary_username APPLE_ID will typically be the email address you use to login to Apple Developer service.  
+The macos_notary_password is an application specific password (see heading 1.3 of the article by Matthias Rebbe - link above).
+
 For the `macos_notary_password` you can pass a reference to the password stored in the system keychain. Use the following format:
 
 ```
