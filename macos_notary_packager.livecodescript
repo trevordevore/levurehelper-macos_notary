@@ -42,8 +42,7 @@ command packagingComplete pBuildProfile, pOutputFolder, pAppA
     return empty
   end if
 
-  put "xcrun notarytool submit \"%s\" --wait" into tCmd
-  put format(tCmd, tEnvA["macos dmg filename"])
+  put format("xcrun notarytool submit \"%s\" --wait", tEnvA["macos dmg filename"]) into tCmd
 
   if tEnvA["macos_notary_keychain"] is not empty then
     put format(" --keychain-profile \"%s\"", tEnvA["macos_notary_keychain"]) after tCmd
