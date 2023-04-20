@@ -42,30 +42,14 @@ command packagingComplete pBuildProfile, pOutputFolder, pAppA
     return empty
   end if
 
-  put pAppA["name"] && pAppA["version"] & "." & pAppA["build"] into tPrimaryId
-  replace space with "-" in tPrimaryId
+  put format("xcrun notarytool submit \"%s\" --wait", tEnvA["macos dmg filename"]) into tCmd
 
-  if tEnvA["macos_notary_password"] is not empty then
+  if tEnvA["macos_notary_keychain"] is not empty then
+    put format(" --keychain-profile \"%s\"", tEnvA["macos_notary_keychain"]) after tCmd
+  else
     # URL encode special characters
     put _rawURLEncode(tEnvA["macos_notary_password"]) into tEnvA["macos_notary_password"]
-  else
-    local tKeyChainName
-
-    put pAppA["name"] into tKeyChainName
-    replace space with "-" in tKeyChainName
-    put tolower(tKeyChainName) into tKeyChainName
-
-    put "levure_macos_notary: " before tKeyChainName
-    put format("@keychain:" & tKeyChainName) into tEnvA["macos_notary_password"]
-  end if
-
-  put "xcrun altool -type osx --notarize-app" into tCmd
-  put format(" --primary-bundle-id \"%s\"", tPrimaryId) after tCmd
-  put format(" --username \"%s\"", tEnvA["macos_notary_username"]) after tCmd
-  put format(" --password \"%s\"", tEnvA["macos_notary_password"]) after tCmd
-  put format(" --file \"%s\"", tEnvA["macos dmg filename"]) after tCmd
-  if tEnvA["macos_notary_ascprovider"] is not empty then
-    put format(" --ascprovider \"%s\"", tEnvA["macos_notary_ascprovider"]) after tCmd
+    put format(" --apple-id \"%s\" --team-id \"%s\" --password \"%s\"", tEnvA["macos_notary_username"], tEnvA["macos_notary_teamid"], tEnvA["macos_notary_password"]) after tCmd
   end if
 
   _log "macos-notary --notarize-app command:" && tCmd
@@ -76,13 +60,17 @@ command packagingComplete pBuildProfile, pOutputFolder, pAppA
   _log "macos-notary --notarize-app response:" &cr& tResult
 
   if tReturnVal is empty then
-    local tRequestUUID
+    if tResult contains "status: Accepted" then
+      local tRequestUUID
 
-    put _extractRequestUUID(tResult) into tRequestUUID
-    if tRequestUUID is not empty then
-      _monitorAnalysisForCompletion tRequestUUID, tEnvA
+      put _extractRequestUUID(tResult) into tRequestUUID
+      if tRequestUUID is not empty then
+        _stapleDMG tEnvA["macos dmg filename"]
+      else
+        answer error "RequestUUID was not found in the response" & cr & "[" & tResult & "]"
+      end if
     else
-      answer error "RequestUUID was not found in the response" & cr & "[" & tResult & "]"
+      answer error "Notarization failed. Check build.log for details."
     end if
   else
     answer error "macOS Notary reported an error in" && param(0) && "[" & tResult & "]"
@@ -124,11 +112,11 @@ Returns: UUID
 private function _extractRequestUUID pAlToolResponse
   local tLineNo, tLine, tRequestUUID
 
-  put lineoffset("RequestUUID = ", pAlToolResponse) into tLineNo
+  put lineoffset("  id: ", pAlToolResponse) into tLineNo
   if tLineNo > 0 then
     put word 1 to -1 of line tLineNo of pAlToolResponse into tLine
-    split tLine by CR and " = "
-    put word 1 to -1 of tLine["RequestUUID"] into tRequestUUID
+    split tLine by CR and ": "
+    put word 1 to -1 of tLine["id"] into tRequestUUID
   end if
 
   return tRequestUUID
@@ -170,84 +158,6 @@ private function _extractResponseVariables pAlToolResponse
 
   return tValuesA
 end _extractResponseVariables
-
-
-/**
-Summary: Monitors the notarization status after the DMG has been successfully uploaded.
-
-Parameters:
-pRequestUUID: The UUID returned by `--notarize-app`.
-pEnvA: The environmental variables with information such as username and password.
-
-Returns: nothing
-*/
-private command _monitorAnalysisForCompletion pRequestUUID, pEnvA
-  local tCmd, tResult, tReturnVal, tCounter
-
-  repeat forever
-    add 1 to tCounter
-
-    put format("xcrun altool --notarization-info \"%s\"", pRequestUUID) into tCmd
-    put format(" --username \"%s\"", pEnvA["macos_notary_username"]) after tCmd
-    put format(" --password \"%s\"", pEnvA["macos_notary_password"]) after tCmd
-    if pEnvA["macos_notary_ascprovider"] is not empty then
-      put format(" --ascprovider \"%s\"", pEnvA["macos_notary_ascprovider"]) after tCmd
-    end if
-
-    if tCounter is 1 then
-      _log "macos-notary --notarize-info command:" && tCmd
-    end if
-    _log "macos-notary --notarize-info attempt #" & tCounter
-
-    put shell(tCmd) into tResult
-    put the result into tReturnVal
-
-    put textDecode(tResult, "utf8") into tResult
-
-    if tReturnVal is empty then
-      local tResponseA
-
-      put _extractResponseVariables(tResult) into tResponseA
-
-      switch tResponseA["Status"]
-        case "in progress"
-          wait 10 seconds with messages
-          break
-
-        case "invalid"
-          _log "macos-notary --notarize-info response:" &cr& tResult
-          answer error "--notarize-info error:" && tResponseA["Status Message"]
-          exit repeat
-          break
-
-        case "success"
-          _log "macos-notary --notarize-info response:" &cr& tResult
-          _stapleDMG pEnvA["macos dmg filename"]
-          exit repeat
-          break
-
-        default
-          _log "macos-notary --notarize-info response:" &cr& tResult
-          answer error "--notarize-info unknown status:" && tResponseA["Status"]
-          exit repeat
-          break
-      end switch
-    else if tReturnVal is not empty \
-          and tResult contains "Could not find the RequestUUID" \
-          and tCounter <= 5 then
-      # Apple has reported the following on the first attempt:
-      # Error: Apple Services operation failed. Could not find the RequestUUID.
-      # Theory is that this can happen if you check too soon after creating the request
-      # and it hasn't propagated to all of the servers yet. Try at least three times.
-      _log "mac-notary --notarize-info trying again since Apple couldn't find RequestUUID."
-      wait 10 seconds with messages
-    else
-      _log "macOS Notary reported an error in" && param(0) && "[" & tResult & "]"
-      answer error "macOS Notary reported an error in" && param(0) && "[" & tResult & "]"
-      exit repeat
-    end if
-  end repeat
-end _monitorAnalysisForCompletion
 
 
 /**

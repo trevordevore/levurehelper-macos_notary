@@ -31,26 +31,27 @@ helpers:
 
 ## Configuring settings for the helper
 
-You will store the username, password, and optional ascprovider information in an `.env` file that sits alongside the `app.yml` file in your application folder. This file SHOULD NOT be included in your git repository as you do not want your username or password to be stored.
+You will store the username, password, and teamid in an `.env` file that sits alongside the `app.yml` file in your application folder. This file SHOULD NOT be included in your git repository as you do not want your username or password to be stored.
 
 The `.env` file should contain the following lines although `macos_notary_ascprovider` is optional):
 
 ```
 macos_notary_username=YOUR_APPLE_ID
 macos_notary_password=YOUR_APP_PASSWORD_OR_KEYCHAIN_ITEM
-macos_notary_ascprovider=YOUR_TEAMID
+macos_notary_teamid=YOUR_TEAMID
 ```
 
 The macos_notary_username APPLE_ID will typically be the email address you use to login to Apple Developer service.  
 The macos_notary_password is an application specific password (see heading 1.3 of the article by Matthias Rebbe - link above).
+You can find the Team ID used for macos_notary_teamid on the Apple developer website. At the time of this writing it is listed under Membership Details at https://developer.apple.com/account#MembershipDetailsCard.
 
-For the `macos_notary_password` you can pass a reference to the password stored in the system keychain. Use the following format:
+If you would like to store the information in the macOS Keychain then follow the instructions at https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/customizing_the_notarization_workflow which explain how to use `xcrun notarytool store-credentials` to store credentials. In the `.env` file set the `macos_notary_keychain` value to the name of the keychain and omit `macos_notary_username`, `macos_notary_password`, and `macos_notary_teamid`.
+
+Example `.env` entry using the keychain name in the Apple docs example:
 
 ```
-macos_notary_password=@keychain:KEYCHAIN_ITEM_NAME
+macos_notary_keychain=AC_PASSWORD
 ```
-
-To set up a keychain item on your system you can use `xcrun altool --store-password-in-keychain-item` as described in the Apple [documentation](https://developer.apple.com/documentation/xcode/notarizing_macos_software_before_distribution/customizing_the_notarization_workflow?language=objc).
 
 ## Monitoring progress during notarization
 
